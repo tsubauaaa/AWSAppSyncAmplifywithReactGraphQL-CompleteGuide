@@ -22,8 +22,8 @@ const CreatePost = () => {
 
   const handleAddPost = () => {
     const input = {
-      postOwnerId: "palA898", // postOwnerId,
-      postOwnerUsername: "Paul", // postOwnerUsername,
+      postOwnerId: "palA8988", // postOwnerId,
+      postOwnerUsername: "Paule", // postOwnerUsername,
       postTitle: postTitle,
       postBody: postBody,
       createdAt: new Date().toISOString(),
