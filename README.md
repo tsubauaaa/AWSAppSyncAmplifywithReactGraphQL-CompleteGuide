@@ -82,3 +82,27 @@ $ amplify console api
 ```
 $ npm install aws-amplify aws-amplify-react
 ```
+
+## Amplify Add Auth
+
+React プロジェクトフォルダ直下で
+
+```
+$ amplify add auth
+```
+
+- Default configuration
+- username
+- No, I am done.
+
+```
+$ amplify push
+```
+
+## @aws-amplify/ui-react インストール
+
+```
+$ npm install @aws-amplify/ui-react
+```
+
+## Cognito ログイン画面からユーザ作成する
