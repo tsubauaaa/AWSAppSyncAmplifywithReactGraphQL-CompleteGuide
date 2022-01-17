@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
 import { listPosts } from "../graphql/queries";
 import { API, graphqlOperation } from "aws-amplify";
-import { ListPostsQuery, OnCreatePostSubscription } from "../API";
+import {
+  ListPostsQuery,
+  OnCreatePostSubscription,
+  OnDeletePostSubscription,
+} from "../API";
 import { GraphQLResult } from "aws-amplify/node_modules/@aws-amplify/api-graphql";
 import DeletePost from "./DeletePost";
 import EditPost from "./EditPost";
-import { onCreatePost } from "../graphql/subscriptions";
+import { onCreatePost, onDeletePost } from "../graphql/subscriptions";
 
 type Post = {
   id: string;
@@ -16,41 +20,69 @@ type Post = {
   createdAt: string;
 };
 
-type PostSubscriptionEvent = {
+type CreatePostSubscriptionEvent = {
   value: { data: OnCreatePostSubscription };
+};
+
+type DeletePostSubscriptionEvent = {
+  value: { data: OnDeletePostSubscription };
 };
 
 const DisplayPosts = () => {
   const [posts, setPosts] = useState<Post[]>([]);
-  // console.log("All Posts: ", JSON.stringify(posts));
-  //   console.log("All Posts: ", posts);
+
   useEffect(() => {
-    getPosts();
-    createPostListener();
+    fetchPosts();
   }, []);
 
-  const getPosts = async () => {
+  useEffect(() => {
+    const client = API.graphql(graphqlOperation(onCreatePost));
+    if ("subscribe" in client) {
+      const sub = () =>
+        client.subscribe({
+          next: async (postData: CreatePostSubscriptionEvent) => {
+            const {
+              value: { data },
+            } = postData;
+            if (data.onCreatePost) {
+              const newPost = data.onCreatePost;
+              setPosts((prev) => [...prev, newPost as Post]);
+            }
+          },
+        });
+      const listener = sub();
+      return () => listener.unsubscribe();
+    }
+  }, [posts]);
+
+  useEffect(() => {
+    const client = API.graphql(graphqlOperation(onDeletePost));
+    if ("subscribe" in client) {
+      const sub = () =>
+        client.subscribe({
+          next: async (deleteData: DeletePostSubscriptionEvent) => {
+            const {
+              value: { data },
+            } = deleteData;
+            if (data.onDeletePost) {
+              const deletePost = data.onDeletePost;
+              const updatedPosts = posts.filter(
+                (post) => post.id !== deletePost.id
+              );
+              setPosts(updatedPosts);
+            }
+          },
+        });
+      const listener = sub();
+      return () => listener.unsubscribe();
+    }
+  }, [posts]);
+
+  const fetchPosts = async () => {
     const apiData = (await API.graphql(
       graphqlOperation(listPosts)
     )) as GraphQLResult<ListPostsQuery>;
     setPosts(apiData.data?.listPosts?.items as Post[]);
-  };
-
-  const createPostListener = async () => {
-    const client = API.graphql(graphqlOperation(onCreatePost));
-    if ("subscribe" in client) {
-      client.subscribe({
-        next: (postData: PostSubscriptionEvent) => {
-          const {
-            value: { data },
-          } = postData;
-          if (data.onCreatePost) {
-            const newPost = data.onCreatePost;
-            setPosts((prev) => [...prev, newPost as Post]);
-          }
-        },
-      });
-    }
   };
 
   return (
@@ -71,7 +103,7 @@ const DisplayPosts = () => {
 
             <br></br>
             <span>
-              <DeletePost />
+              <DeletePost id={post.id} />
               <EditPost />
             </span>
           </div>

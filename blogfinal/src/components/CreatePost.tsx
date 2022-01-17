@@ -1,12 +1,16 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { createPost } from "../graphql/mutations";
-import { API, graphqlOperation } from "aws-amplify";
+import { API, Auth, graphqlOperation } from "aws-amplify";
 
 const CreatePost = () => {
   const [postOwnerId, setPostOwnerId] = useState("");
   const [postOwnerUsername, setPostOwnerUsername] = useState("");
   const [postTitle, setPostTitle] = useState("");
   const [postBody, setPostBody] = useState("");
+
+  useEffect(() => {
+    currentUserInfo();
+  }, []);
 
   const handleChangePostTitle = (
     event: React.ChangeEvent<HTMLInputElement>
@@ -22,8 +26,8 @@ const CreatePost = () => {
 
   const handleAddPost = () => {
     const input = {
-      postOwnerId: "palA8988", // postOwnerId,
-      postOwnerUsername: "Paule", // postOwnerUsername,
+      postOwnerId: postOwnerId,
+      postOwnerUsername: postOwnerUsername,
       postTitle: postTitle,
       postBody: postBody,
       createdAt: new Date().toISOString(),
@@ -31,6 +35,13 @@ const CreatePost = () => {
     API.graphql(graphqlOperation(createPost, { input }));
     setPostTitle("");
     setPostBody("");
+  };
+
+  const currentUserInfo = async () => {
+    await Auth.currentUserInfo().then((user) => {
+      setPostOwnerId(user.attributes.sub);
+      setPostOwnerUsername(user.username);
+    });
   };
 
   return (
