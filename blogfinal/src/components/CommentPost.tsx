@@ -8,7 +8,7 @@ interface PROPS {
 
 const CommentPost: React.FC<PROPS> = (props) => {
   return (
-    <div>
+    <div className="comment">
       <span style={{ fontStyle: "italic", color: "#0ca5e297" }}>
         {"Comment by: "} {props.commentOwnerUsername}
         {" on "}

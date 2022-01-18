@@ -6,7 +6,11 @@
     "gqlSchemaPath": "/Users/ts-hirota/git/github/tsubauaaa/AWSAppSyncAmplifywithReactGraphQL-CompleteGuide/blogfinal/amplify/backend/api/blogfinal/schema.graphql",
     "defaultAuthType": {
       "mode": "API_KEY",
-      "expirationTime": 7
-    }
+      "expirationTime": 365,
+      "apiKeyExpirationDate": "2023-01-18T14:10:26.099Z",
+      "keyDescription": "AKIA5FZCY2NSY3XJWIEE"
+    },
+    "conflictResolution": {},
+    "additionalAuthTypes": []
   }
 }

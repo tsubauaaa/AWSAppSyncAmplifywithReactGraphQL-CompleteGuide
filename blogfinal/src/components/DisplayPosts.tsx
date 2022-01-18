@@ -2,14 +2,12 @@ import { useEffect, useState } from "react";
 import { listPosts } from "../graphql/queries";
 import { API, graphqlOperation } from "aws-amplify";
 import {
-  ListPostsQuery,
   OnCreateCommentSubscription,
   OnCreatePostSubscription,
   OnDeletePostSubscription,
   OnUpdatePostSubscription,
   Post,
 } from "../API";
-import { GraphQLResult } from "aws-amplify/node_modules/@aws-amplify/api-graphql";
 import DeletePost from "./DeletePost";
 import EditPost from "./EditPost";
 import {
@@ -19,6 +17,9 @@ import {
   onUpdatePost,
 } from "../graphql/subscriptions";
 import CreateCommentPost from "./CreateCommentPost";
+import CommentPost from "./CommentPost";
+
+import { FaThumbsUp } from "react-icons/fa";
 
 type CreatePostSubscriptionEvent = {
   value: { data: OnCreatePostSubscription };
@@ -44,10 +45,8 @@ const DisplayPosts = () => {
   }, []);
 
   const fetchPosts = async () => {
-    const apiData = (await API.graphql(
-      graphqlOperation(listPosts)
-    )) as GraphQLResult<ListPostsQuery>;
-    setPosts(apiData.data?.listPosts?.items as Post[]);
+    const apiData = (await API.graphql(graphqlOperation(listPosts))) as any;
+    setPosts(apiData.data?.listPosts?.items as Array<Post>);
   };
 
   useEffect(() => {
@@ -61,7 +60,7 @@ const DisplayPosts = () => {
             } = postData;
             if (data.onCreatePost) {
               const newPost = data.onCreatePost;
-              setPosts((prev) => [...prev, newPost as Post]);
+              setPosts((prev) => [...prev, newPost]);
             }
           },
         });
@@ -121,21 +120,27 @@ const DisplayPosts = () => {
     }
   }, [posts]);
 
-  //   useEffect(() => {
-  //     const client = API.graphql(graphqlOperation(onCreateComment));
-  //     if ("subscribe" in client) {
-  //         const sub = () => client.subscribe({
-  //             next: async (commentData: CreateCommentSubscriptionEvent) => {
-  //                 const createdComment = commentData.value.data.onCreateComment;
-  //                 setPosts((prev) => {
-  //                     for (let post of prev) {
-  //                         if (createdComment?.post.id === post.id) {
-  //                             post.comments?.items.push(createdComment);
-  //                         }
-  //                     }
-  //                 })
-  //         })
-  //   }, [posts]);
+  useEffect(() => {
+    const client = API.graphql(graphqlOperation(onCreateComment));
+    if ("subscribe" in client) {
+      const sub = () =>
+        client.subscribe({
+          next: async (commentData: CreateCommentSubscriptionEvent) => {
+            const createdComment = commentData.value.data.onCreateComment;
+            let temp = [...posts];
+            for (let post of temp) {
+              if (createdComment?.post?.id === post.id) {
+                post.comments?.items.push(createdComment as any);
+              }
+            }
+            setPosts(temp);
+          },
+        });
+
+      const listener = sub();
+      return () => listener.unsubscribe();
+    }
+  }, [posts]);
 
   return (
     <>
@@ -160,7 +165,16 @@ const DisplayPosts = () => {
             </span>
             <span>
               <CreateCommentPost postId={post.id} />
+              {post.comments?.items?.length! > 0 && (
+                <span style={{ fontSize: "19px", color: "gray" }}>
+                  Comments:
+                </span>
+              )}
+              {post.comments?.items?.map((comment, index) => (
+                <CommentPost key={index} {...comment!} />
+              ))}
             </span>
+            <FaThumbsUp />
           </div>
         );
       })}

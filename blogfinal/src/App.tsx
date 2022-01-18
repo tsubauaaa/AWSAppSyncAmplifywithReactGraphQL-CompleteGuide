@@ -21,4 +21,4 @@ const App = () => {
 };
 
 //@ts-ignore
-export default withAuthenticator(App);
+export default withAuthenticator(App, { includeGreetings: true });
