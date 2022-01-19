@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { listPosts } from "../graphql/queries";
-import { API, graphqlOperation } from "aws-amplify";
+import { API, Auth, graphqlOperation } from "aws-amplify";
 import {
+  ListPostsQuery,
   OnCreateCommentSubscription,
+  OnCreateLikeSubscription,
   OnCreatePostSubscription,
   OnDeletePostSubscription,
   OnUpdatePostSubscription,
@@ -12,14 +14,17 @@ import DeletePost from "./DeletePost";
 import EditPost from "./EditPost";
 import {
   onCreateComment,
+  onCreateLike,
   onCreatePost,
   onDeletePost,
   onUpdatePost,
 } from "../graphql/subscriptions";
 import CreateCommentPost from "./CreateCommentPost";
 import CommentPost from "./CommentPost";
-
-import { FaThumbsUp } from "react-icons/fa";
+import UsersWhoLikedPost from "./UsersWhoLikedPost";
+import { FaSadTear, FaThumbsUp } from "react-icons/fa";
+import { createLike } from "../graphql/mutations";
+import { GraphQLResult } from "aws-amplify/node_modules/@aws-amplify/api-graphql";
 
 type CreatePostSubscriptionEvent = {
   value: { data: OnCreatePostSubscription };
@@ -37,18 +42,25 @@ type CreateCommentSubscriptionEvent = {
   value: { data: OnCreateCommentSubscription };
 };
 
+type CreateLikeSubscriptionEvent = {
+  value: { data: OnCreateLikeSubscription };
+};
+
 const DisplayPosts = () => {
+  const [ownerId, setOwnerId] = useState("");
+  const [ownerUsername, setOwnerUsername] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [postLikedBy, setPostLikedBy] = useState<string[]>([]);
+  const [isHovering, setIsHovering] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
 
+  // fetch posts
   useEffect(() => {
     fetchPosts();
+    currentUserInfo();
   }, []);
 
-  const fetchPosts = async () => {
-    const apiData = (await API.graphql(graphqlOperation(listPosts))) as any;
-    setPosts(apiData.data?.listPosts?.items as Array<Post>);
-  };
-
+  // create post subscription
   useEffect(() => {
     const client = API.graphql(graphqlOperation(onCreatePost));
     if ("subscribe" in client) {
@@ -69,6 +81,7 @@ const DisplayPosts = () => {
     }
   }, [posts]);
 
+  // delete post subscription
   useEffect(() => {
     const client = API.graphql(graphqlOperation(onDeletePost));
     if ("subscribe" in client) {
@@ -92,6 +105,7 @@ const DisplayPosts = () => {
     }
   }, [posts]);
 
+  // update post subscription
   useEffect(() => {
     const client = API.graphql(graphqlOperation(onUpdatePost));
     if ("subscribe" in client) {
@@ -120,6 +134,7 @@ const DisplayPosts = () => {
     }
   }, [posts]);
 
+  // create comment subscription
   useEffect(() => {
     const client = API.graphql(graphqlOperation(onCreateComment));
     if ("subscribe" in client) {
@@ -142,6 +157,98 @@ const DisplayPosts = () => {
     }
   }, [posts]);
 
+  // create like subscription
+  useEffect(() => {
+    const client = API.graphql(graphqlOperation(onCreateLike));
+    if ("subscribe" in client) {
+      const sub = () =>
+        client.subscribe({
+          next: async (commentData: CreateLikeSubscriptionEvent) => {
+            const createdLike = commentData.value.data.onCreateLike;
+            let temp = [...posts];
+            for (let post of temp) {
+              if (createdLike?.post?.id === post.id) {
+                post.likes?.items.push(createdLike as any);
+              }
+            }
+            setPosts(temp);
+          },
+        });
+
+      const listener = sub();
+      return () => listener.unsubscribe();
+    }
+  }, [posts]);
+
+  const fetchPosts = async () => {
+    const apiData = (await API.graphql(
+      graphqlOperation(listPosts)
+    )) as GraphQLResult<ListPostsQuery>;
+    setPosts(apiData.data?.listPosts?.items as Array<Post>);
+  };
+
+  const currentUserInfo = async () => {
+    await Auth.currentUserInfo().then((user) => {
+      setOwnerId(user.attributes.sub);
+      setOwnerUsername(user.username);
+    });
+  };
+
+  const likedPost = (postId: string) => {
+    for (let post of posts) {
+      if (post.id === postId) {
+        if (post.postOwnerId === ownerId) return true;
+        for (let like of post.likes?.items!) {
+          if (like!.likeOwnerId === ownerId) return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  const handleMouseHover = async (postId: string) => {
+    setIsHovering(!isHovering);
+    const innerLikes = postLikedBy;
+    for (let post of posts) {
+      if (post.id === postId) {
+        for (let like of post.likes?.items!) {
+          innerLikes.push(like?.likeOwnerUsername!);
+        }
+      }
+      setPostLikedBy(innerLikes);
+    }
+    console.log("Post liked by: ", postLikedBy);
+  };
+
+  const handleMouseHoverLeave = () => {
+    setIsHovering(!isHovering);
+    setPostLikedBy([]);
+  };
+
+  const handleLike = async (postId: string) => {
+    if (likedPost(postId)) {
+      return setErrorMessage("Can't Like Your Own Post.");
+    } else {
+      const input = {
+        numberLikes: 1,
+        likeOwnerId: ownerId,
+        likeOwnerUsername: ownerUsername,
+        likePostId: postId,
+      };
+
+      try {
+        const result: any = await API.graphql(
+          graphqlOperation(createLike, { input })
+        );
+        console.log("Liked: ", result.data);
+      } catch (error) {
+        console.log(error);
+      }
+    }
+  };
+
+  console.log("Posts: ", posts);
+
   return (
     <>
       {posts.map((post) => {
@@ -157,12 +264,42 @@ const DisplayPosts = () => {
               </time>
             </span>
             <p>{post.postBody}</p>
-
-            <br></br>
+            <br />
             <span>
-              <DeletePost id={post.id} />
-              <EditPost {...post} />
+              {post.postOwnerId === ownerId && <DeletePost id={post.id} />}
+
+              {post.postOwnerId === ownerId && <EditPost {...post} />}
+              <span>
+                <p className="alert">
+                  {post.postOwnerId === ownerId && errorMessage}
+                </p>
+                <p
+                  onMouseEnter={() => handleMouseHover(post.id)}
+                  onMouseLeave={() => handleMouseHoverLeave()}
+                  onClick={() => handleLike(post.id)}
+                  style={{
+                    color: post.likes?.items?.length! > 0 ? "blue" : "gray",
+                  }}
+                  className="like-button"
+                >
+                  <FaThumbsUp />
+                  {post.likes?.items?.length}
+                </p>
+                {isHovering && (
+                  <div className="user-liked">
+                    {postLikedBy.length === 0
+                      ? " Liked by No one "
+                      : "Liked by:"}
+                    {postLikedBy.length === 0 ? (
+                      <FaSadTear />
+                    ) : (
+                      <UsersWhoLikedPost allUsers={postLikedBy} />
+                    )}
+                  </div>
+                )}
+              </span>
             </span>
+
             <span>
               <CreateCommentPost postId={post.id} />
               {post.comments?.items?.length! > 0 && (
@@ -174,7 +311,9 @@ const DisplayPosts = () => {
                 <CommentPost key={index} {...comment!} />
               ))}
             </span>
-            <FaThumbsUp />
+            <p className="alert">
+              {post.postOwnerId === ownerId && errorMessage}
+            </p>
           </div>
         );
       })}

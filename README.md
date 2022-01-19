@@ -105,4 +105,20 @@ $ amplify push
 $ npm install @aws-amplify/ui-react
 ```
 
-## Cognito ログイン画面からユーザ作成する
+## Web アプリの Cognito ログイン画面からユーザ作成する
+
+## Amplify add hosting
+
+```
+$ amplify hosting add
+```
+
+- Amazon CloudFront and S3
+- DEV
+- hosting bucket name -> デフォルト
+- index doc for the website -> index.html
+- error doc for the website -> index.html
+
+```
+$ amplify publish
+```
