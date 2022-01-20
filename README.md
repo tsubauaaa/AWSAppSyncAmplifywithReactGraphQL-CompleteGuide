@@ -58,7 +58,7 @@ $ amplify add api
 
 - services を GraphQL
 - API キーの有効期間は 7 日だけど、このまま続ける
-- スキーマテンプレートを Single object with fields
+- スキーマテンプレートを Single object with fields -> One-to-many relationshipにすべきであった
 - スキーマを今、変更する
 
 ## Amplify Push
